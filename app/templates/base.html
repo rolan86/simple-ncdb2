@@ -1,0 +1,38 @@
+<!-- File: app/templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Data Management App{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-blue-600 p-4 text-white">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="{{ url_for('main.index') }}" class="text-2xl font-bold">Data App</a>
+            <div>
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('main.dashboard') }}" class="mr-4">Dashboard</a>
+                    <a href="{{ url_for('auth.logout') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('auth.login') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    <div class="container mx-auto mt-8">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="bg-{{ category }}-100 border-l-4 border-{{ category }}-500 text-{{ category }}-700 p-4 mb-4" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

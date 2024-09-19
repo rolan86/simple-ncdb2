@@ -1,0 +1,18 @@
+<!-- File: app/templates/dashboard.html -->
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Data Management App{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Welcome, {{ current_user.username }}</h1>
+<h2 class="text-xl font-semibold mb-2">Your Accessible Tables:</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for table in tables %}
+    <a href="{{ url_for('data.view_table', table_name=table) }}"
+       class="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-100">
+        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900">{{ table | title }}</h5>
+        <p class="font-normal text-gray-700">Click to view or edit this table.</p>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}
