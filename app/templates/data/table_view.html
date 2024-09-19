@@ -1,4 +1,3 @@
-<!-- File: app/templates/data/table_view.html -->
 {% extends "base.html" %}
 
 {% block title %}{{ table_name | title }} - Data Management App{% endblock %}
@@ -19,14 +18,14 @@
     <table class="min-w-full bg-white">
         <thead>
             <tr>
-                {% for column in core_columns %}
-                <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
-                    Core: {{ column }}
-                </th>
-                {% endfor %}
                 {% for column in columns %}
                 <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
                     {{ column }}
+                </th>
+                {% endfor %}
+                {% for column in core_columns %}
+                <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                    Core: {{ column }}
                 </th>
                 {% endfor %}
                 {% if 'edit' in user_permissions and table_name in user_tables %}
@@ -37,57 +36,23 @@
             </tr>
         </thead>
         <tbody>
-            {% if data %}
-                {% for entry, core_entry in data %}
-                <tr>
-                    {% for column in core_columns %}
-                    <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-300 bg-gray-100">
-                        {{ getattr(core_entry, column) if core_entry else 'N/A' }}
-                    </td>
-                    {% endfor %}
-                    {% for column in columns %}
-                    <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-300">
-                        {{ getattr(entry, column) }}
-                    </td>
-                    {% endfor %}
-                    {% if 'edit' in user_permissions and table_name in user_tables %}
-                    <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-300">
-                        <a href="{{ url_for('data.edit_entry', table_name=table_name, entry_id=entry.id) }}" class="text-blue-600 hover:text-blue-900">Edit</a>
-                    </td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            {% else %}
-                <tr>
-                    <td colspan="{{ core_columns|length + columns|length + 1 }}" class="px-6 py-4 whitespace-no-wrap border-b border-gray-300 text-center">
-                        No data available for this table.
-                    </td>
-                </tr>
-            {% endif %}
-        </tbody>
-    </table>
-</div>
-
-<h2 class="text-xl font-bold mt-8 mb-4">All Core Entries</h2>
-<div class="overflow-x-auto">
-    <table class="min-w-full bg-white">
-        <thead>
+            {% for row, core in data %}
             <tr>
-                {% for column in core_columns %}
-                <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
-                    {{ column }}
-                </th>
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for core_entry in all_core_entries %}
-            <tr>
-                {% for column in core_columns %}
+                {% for column in columns %}
                 <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-300">
-                    {{ getattr(core_entry, column) }}
+                    {{ getattr(row, column) }}
                 </td>
                 {% endfor %}
+                {% for column in core_columns %}
+                <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-300 bg-gray-100">
+                    {{ getattr(core, column) if core else 'N/A' }}
+                </td>
+                {% endfor %}
+                {% if 'edit' in user_permissions and table_name in user_tables %}
+                <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-300">
+                    <a href="{{ url_for('data.edit_entry', table_name=table_name, entry_id=row.id) }}" class="text-blue-600 hover:text-blue-900">Edit</a>
+                </td>
+                {% endif %}
             </tr>
             {% endfor %}
         </tbody>

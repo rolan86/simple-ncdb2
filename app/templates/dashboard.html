@@ -5,6 +5,11 @@
 
 {% block content %}
 <h1 class="text-2xl font-bold mb-4">Welcome, {{ current_user.username }}</h1>
+{% if current_user.is_admin %}
+<a href="{{ url_for('data.create_dynamic_table_route') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+    Create Dynamic Table
+</a>
+{% endif %}
 <h2 class="text-xl font-semibold mb-2">Your Accessible Tables:</h2>
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for table in tables %}

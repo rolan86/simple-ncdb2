@@ -1,13 +1,18 @@
-# File: app/models/dynamic_tables.py
-
 from app import db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from datetime import datetime
 import logging
 
+# Dictionary to store our dynamic table classes
+dynamic_table_classes = {}
+
 def create_dynamic_table(table_name, columns):
     logging.info(f"Creating dynamic table: {table_name}")
-    
+
+    if table_name in dynamic_table_classes:
+        logging.info(f"Table {table_name} already exists, returning existing class")
+        return dynamic_table_classes[table_name]
+
     class DynamicTable(db.Model):
         __tablename__ = table_name
         id = Column(Integer, primary_key=True)
@@ -20,17 +25,35 @@ def create_dynamic_table(table_name, columns):
             setattr(DynamicTable, column_name, Column(String(255)))
         elif column_type == 'integer':
             setattr(DynamicTable, column_name, Column(Integer))
-        # Add more types as needed
         logging.info(f"Added column {column_name} of type {column_type} to {table_name}")
+
+    # Store the newly created table class in our dictionary
+    dynamic_table_classes[table_name] = DynamicTable
 
     logging.info(f"Dynamic table {table_name} created successfully")
     return DynamicTable
 
 def get_table_class(table_name):
     logging.info(f"Attempting to get table class for: {table_name}")
-    for cls in db.Model.__subclasses__():
-        if hasattr(cls, '__tablename__') and cls.__tablename__ == table_name:
-            logging.info(f"Found table class for: {table_name}")
-            return cls
-    logging.warning(f"Table class not found for: {table_name}")
-    return None
+    logging.info(f"Available dynamic tables: {list(dynamic_table_classes.keys())}")
+    return dynamic_table_classes.get(table_name)
+
+def get_all_dynamic_tables():
+    return list(dynamic_table_classes.keys())
+
+def ensure_dynamic_tables_exist():
+    create_dynamic_table('employees', {
+        'name': 'string',
+        'position': 'string',
+        'salary': 'integer'
+    })
+
+    create_dynamic_table('projects', {
+        'name': 'string',
+        'description': 'string',
+        'status': 'string'
+    })
+
+    # Add any other dynamic tables here
+
+    logging.info(f"Ensured existence of dynamic tables: {get_all_dynamic_tables()}")

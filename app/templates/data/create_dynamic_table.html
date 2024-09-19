@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Create Dynamic Table</h1>
+
+<form method="POST" class="mb-8">
+    <div class="mb-4">
+        <label for="table_name" class="block text-gray-700 text-sm font-bold mb-2">Table Name:</label>
+        <input type="text" id="table_name" name="table_name" required
+               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+    </div>
+
+    <div id="columns-container">
+        <div class="mb-4 flex">
+            <div class="w-1/2 pr-2">
+                <label for="column_name_1" class="block text-gray-700 text-sm font-bold mb-2">Column Name:</label>
+                <input type="text" id="column_name_1" name="column_name_1" required
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div class="w-1/2 pl-2">
+                <label for="column_type_1" class="block text-gray-700 text-sm font-bold mb-2">Column Type:</label>
+                <select id="column_type_1" name="column_type_1" required
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="string">String</option>
+                    <option value="integer">Integer</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <button type="button" id="add-column" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4">
+        Add Column
+    </button>
+
+    <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+        Create Table
+    </button>
+</form>
+
+<h2 class="text-xl font-bold mb-2">Existing Dynamic Tables:</h2>
+<ul class="list-disc pl-5">
+    {% for table in existing_tables %}
+    <li>{{ table }}</li>
+    {% endfor %}
+</ul>
+
+<script>
+    let columnCount = 1;
+    const maxColumns = 5;
+
+    document.getElementById('add-column').addEventListener('click', function() {
+        if (columnCount < maxColumns) {
+            columnCount++;
+            const newColumn = document.createElement('div');
+            newColumn.className = 'mb-4 flex';
+            newColumn.innerHTML = `
+                <div class="w-1/2 pr-2">
+                    <label for="column_name_${columnCount}" class="block text-gray-700 text-sm font-bold mb-2">Column Name:</label>
+                    <input type="text" id="column_name_${columnCount}" name="column_name_${columnCount}"
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="w-1/2 pl-2">
+                    <label for="column_type_${columnCount}" class="block text-gray-700 text-sm font-bold mb-2">Column Type:</label>
+                    <select id="column_type_${columnCount}" name="column_type_${columnCount}"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="string">String</option>
+                        <option value="integer">Integer</option>
+                    </select>
+                </div>
+            `;
+            document.getElementById('columns-container').appendChild(newColumn);
+        }
+        if (columnCount === maxColumns) {
+            this.disabled = true;
+        }
+    });
+</script>
+{% endblock %}
