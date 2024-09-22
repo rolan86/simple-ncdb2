@@ -1,59 +1,73 @@
+# File: app/models/dynamic_tables.py
+
 from app import db
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from datetime import datetime
 import logging
-
-# Dictionary to store our dynamic table classes
-dynamic_table_classes = {}
+from .dynamic_table import DynamicTable
 
 def create_dynamic_table(table_name, columns):
     logging.info(f"Creating dynamic table: {table_name}")
 
-    if table_name in dynamic_table_classes:
+    # Check if the table already exists
+    existing_table = DynamicTable.query.filter_by(table_name=table_name).first()
+    if existing_table:
         logging.info(f"Table {table_name} already exists, returning existing class")
-        return dynamic_table_classes[table_name]
+        return get_table_class(table_name)
 
-    class DynamicTable(db.Model):
-        __tablename__ = table_name
-        id = Column(Integer, primary_key=True)
-        core_uuid = Column(String(36), ForeignKey('core_table.uuid'), nullable=False)
-        created_at = Column(DateTime, default=datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Create a new entry in the DynamicTable model
+    new_dynamic_table = DynamicTable(table_name=table_name, schema=columns)
+    db.session.add(new_dynamic_table)
+    db.session.commit()
+
+    # Create the actual table
+    metadata = db.metadata
+    table = Table(table_name, metadata,
+        Column('id', Integer, primary_key=True),
+        Column('core_uuid', String(36), ForeignKey('core_table.uuid'), nullable=False),
+        Column('created_at', DateTime, default=datetime.utcnow),
+        Column('updated_at', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    )
 
     for column_name, column_type in columns.items():
         if column_type == 'string':
-            setattr(DynamicTable, column_name, Column(String(255)))
+            table.append_column(Column(column_name, String(255)))
         elif column_type == 'integer':
-            setattr(DynamicTable, column_name, Column(Integer))
+            table.append_column(Column(column_name, Integer))
         logging.info(f"Added column {column_name} of type {column_type} to {table_name}")
 
-    # Store the newly created table class in our dictionary
-    dynamic_table_classes[table_name] = DynamicTable
-
+    table.create(db.engine)
     logging.info(f"Dynamic table {table_name} created successfully")
-    return DynamicTable
+    return table
 
 def get_table_class(table_name):
     logging.info(f"Attempting to get table class for: {table_name}")
-    logging.info(f"Available dynamic tables: {list(dynamic_table_classes.keys())}")
-    return dynamic_table_classes.get(table_name)
+    dynamic_table = DynamicTable.query.filter_by(table_name=table_name).first()
+    if not dynamic_table:
+        logging.info(f"Table {table_name} not found")
+        return None
+
+    metadata = db.metadata
+    return Table(table_name, metadata, autoload_with=db.engine)
 
 def get_all_dynamic_tables():
-    return list(dynamic_table_classes.keys())
+    return [table.table_name for table in DynamicTable.query.all()]
 
 def ensure_dynamic_tables_exist():
-    create_dynamic_table('employees', {
-        'name': 'string',
-        'position': 'string',
-        'salary': 'integer'
-    })
+    tables_to_create = [
+        ('employees', {
+            'name': 'string',
+            'position': 'string',
+            'salary': 'integer'
+        }),
+        ('projects', {
+            'name': 'string',
+            'description': 'string',
+            'status': 'string'
+        })
+    ]
 
-    create_dynamic_table('projects', {
-        'name': 'string',
-        'description': 'string',
-        'status': 'string'
-    })
-
-    # Add any other dynamic tables here
+    for table_name, columns in tables_to_create:
+        create_dynamic_table(table_name, columns)
 
     logging.info(f"Ensured existence of dynamic tables: {get_all_dynamic_tables()}")

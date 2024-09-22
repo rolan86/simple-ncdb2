@@ -4,7 +4,7 @@ from flask import Blueprint, render_template, flash, redirect, url_for, request,
 from flask_login import login_required, current_user
 from app import db
 from app.models.dynamic_tables import create_dynamic_table, get_table_class, get_all_dynamic_tables
-from sqlalchemy import inspect
+from sqlalchemy import inspect, insert, select
 from app.models.core_table import CoreTable
 from sqlalchemy.orm import aliased
 import logging
@@ -19,60 +19,132 @@ from sqlalchemy.orm import aliased
 @bp.route('/view_table/<table_name>')
 @login_required
 def view_table(table_name):
-    if table_name not in (current_user.accessible_tables or '').split(','):
+    if table_name not in current_user.get_accessible_tables():
+        flash('You do not have permission to view this table.', 'error')
+        return redirect(url_for('main.dashboard'))
+    
+    Table = get_table_class(table_name)
+    if Table is None:
+        flash('Table not found.', 'error')
+        return redirect(url_for('main.dashboard'))
+    
+    try:
+        # Fetch data from the dynamic table
+        stmt = select(Table)
+        result = db.session.execute(stmt)
+        
+        # Log raw query result
+        logging.debug(f"Raw query result: {list(result)}")
+        
+        data = []
+        columns = [column.name for column in Table.columns 
+                   if column.name not in ['id', 'created_at', 'updated_at']]
+        
+        logging.debug(f"Columns for table {table_name}: {columns}")
+        
+        for row in result:
+            row_dict = {}
+            for column in columns:
+                value = getattr(row[0], column, None)
+                row_dict[column] = str(value) if value is not None else ''
+            
+            logging.debug(f"Processed row data: {row_dict}")
+            
+            core_entry = None
+            if 'core_uuid' in row_dict and row_dict['core_uuid']:
+                core_entry = CoreTable.query.filter_by(uuid=row_dict['core_uuid']).first()
+                logging.debug(f"Core entry found: {core_entry}")
+            
+            core_data = core_entry.to_dict() if core_entry else {}
+            logging.debug(f"Core data: {core_data}")
+            
+            data.append((row_dict, core_data))
+        
+        core_columns = ['name', 'description']
+        
+        logging.debug(f"Final data: {data}")
+        logging.debug(f"Core columns: {core_columns}")
+        
+        return render_template('data/table_view.html', 
+                               table_name=table_name, 
+                               data=data, 
+                               columns=columns,
+                               core_columns=core_columns,
+                               user_permissions=current_user.permissions.split(','),
+                               user_tables=current_user.get_accessible_tables())
+    except Exception as e:
+        logging.error(f"Error viewing table {table_name}: {str(e)}")
+        flash(f'Error viewing table: {str(e)}', 'error')
+        return redirect(url_for('main.dashboard'))
+
+@bp.route('/select_view/<table_name>')
+@login_required
+def select_view(table_name):
+    if table_name not in current_user.get_accessible_tables():
+        flash('You do not have permission to view this table.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+    return render_template('data/select_view.html', table_name=table_name)
+
+@bp.route('/view_data/<table_name>/<view_type>')
+@login_required
+def view_data(table_name, view_type):
+    if table_name not in current_user.get_accessible_tables():
         flash('You do not have permission to view this table.', 'error')
         return redirect(url_for('main.dashboard'))
 
     Table = get_table_class(table_name)
-    if not Table:
+    if Table is None:
         flash('Table not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
-    try:
-        CoreTableAlias = aliased(CoreTable)
-        data = db.session.query(Table, CoreTableAlias).outerjoin(
-            CoreTableAlias, Table.core_uuid == CoreTableAlias.uuid
-        ).all()
+    CoreTableAlias = aliased(CoreTable)
+    data = db.session.query(Table, CoreTableAlias).outerjoin(
+        CoreTableAlias, Table.core_uuid == CoreTableAlias.uuid
+    ).all()
 
-        columns = [column.name for column in Table.__table__.columns
-                   if column.name not in ['id', 'core_uuid', 'created_at', 'updated_at']]
-        core_columns = ['name', 'description']
+    columns = [column.name for column in Table.columns
+               if column.name not in ['id', 'core_uuid', 'created_at', 'updated_at']]
+    core_columns = ['name', 'description']
 
-        return render_template('data/table_view.html',
-                               table_name=table_name,
-                               data=data,
-                               columns=columns,
-                               core_columns=core_columns,
-                               user_permissions=current_user.permissions.split(','),
-                               user_tables=current_user.accessible_tables.split(','))
-    except Exception as e:
-        flash(f'Error retrieving data: {str(e)}', 'error')
-        return redirect(url_for('main.dashboard'))
+    return render_template(f'data/{view_type}_view.html',
+                           table_name=table_name,
+                           data=data,
+                           columns=columns,
+                           core_columns=core_columns,
+                           user_permissions=current_user.permissions.split(','))
 
 @bp.route('/add_entry/<table_name>', methods=['GET', 'POST'])
 @login_required
 def add_entry(table_name):
-    if 'edit' not in current_user.permissions.split(',') or table_name not in current_user.accessible_tables.split(','):
+    if 'edit' not in current_user.permissions.split(',') or table_name not in current_user.get_accessible_tables():
         flash('You do not have permission to add entries to this table.', 'error')
         return redirect(url_for('main.dashboard'))
 
     Table = get_table_class(table_name)
-    if not Table:
+    if Table is None:
         flash('Table not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
     if request.method == 'POST':
-        new_entry = Table()
-        for column in Table.__table__.columns:
-            if column.name not in ['id', 'core_uuid', 'created_at', 'updated_at']:
-                setattr(new_entry, column.name, request.form.get(column.name))
-        db.session.add(new_entry)
-        db.session.commit()
-        flash('New entry added successfully.', 'success')
-        return redirect(url_for('data.view_table', table_name=table_name))
+        new_entry = {}
+        for column in Table.columns:
+            if column.name not in ['id', 'created_at', 'updated_at']:
+                new_entry[column.name] = request.form.get(column.name)
+        
+        try:
+            stmt = insert(Table).values(**new_entry)
+            db.session.execute(stmt)
+            db.session.commit()
+            flash('New entry added successfully.', 'success')
+            return redirect(url_for('data.view_table', table_name=table_name))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding entry: {str(e)}', 'error')
 
-    columns = [column for column in Table.__table__.columns if column.name not in ['id', 'core_uuid', 'created_at', 'updated_at']]
-    return render_template('data/add_entry.html', table_name=table_name, columns=columns)
+    columns = [column for column in Table.columns if column.name not in ['id', 'created_at', 'updated_at']]
+    core_entries = CoreTable.query.all()
+    return render_template('data/add_entry.html', table_name=table_name, columns=columns, core_entries=core_entries)
 
 @bp.route('/edit_entry/<table_name>/<int:entry_id>', methods=['GET', 'POST'])
 @login_required
@@ -82,7 +154,7 @@ def edit_entry(table_name, entry_id):
         return redirect(url_for('main.dashboard'))
 
     Table = get_table_class(table_name)
-    if not Table:
+    if Table is None:
         flash('Table not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
@@ -120,7 +192,7 @@ def create_entry(table_name):
         return jsonify({'error': 'Permission denied'}), 403
 
     Table = get_table_class(table_name)
-    if not Table:
+    if Table is None:
         return jsonify({'error': 'Table not found'}), 404
 
     data = request.json
@@ -136,7 +208,7 @@ def update_entry(table_name, entry_id):
         return jsonify({'error': 'Permission denied'}), 403
 
     Table = get_table_class(table_name)
-    if not Table:
+    if Table is None:
         return jsonify({'error': 'Table not found'}), 404
 
     entry = db.session.query(Table).get(entry_id)
@@ -157,7 +229,7 @@ def delete_entry(table_name, entry_id):
         return jsonify({'error': 'Permission denied'}), 403
 
     Table = get_table_class(table_name)
-    if not Table:
+    if Table is None:
         return jsonify({'error': 'Table not found'}), 404
 
     entry = db.session.query(Table).get(entry_id)
@@ -177,7 +249,7 @@ def list_tables():
 
 @bp.route('/debug/tables')
 def debug_tables():
-    from app.models.dynamic_tables import get_all_dynamic_tables, dynamic_table_classes
+    from app.models.dynamic_tables import get_all_dynamic_tables
     from sqlalchemy import inspect
 
     inspector = inspect(db.engine)
@@ -187,7 +259,6 @@ def debug_tables():
     return jsonify({
         'all_tables': all_tables,
         'dynamic_tables': dynamic_tables,
-        'dynamic_table_classes': list(dynamic_table_classes.keys())
     })
 
 @bp.route('/create_dynamic_table', methods=['GET', 'POST'])
@@ -211,7 +282,6 @@ def create_dynamic_table_route():
         else:
             try:
                 create_dynamic_table(table_name, columns)
-                db.create_all()
 
                 # Update admin's accessible tables
                 if current_user.is_admin:
@@ -227,3 +297,27 @@ def create_dynamic_table_route():
 
     existing_tables = get_all_dynamic_tables()
     return render_template('data/create_dynamic_table.html', existing_tables=existing_tables)
+
+@bp.route('/update_entries/<table_name>', methods=['PUT'])
+@login_required
+def update_entries(table_name):
+    if 'edit' not in current_user.permissions.split(',') or table_name not in current_user.get_accessible_tables():
+        return jsonify({'error': 'Permission denied'}), 403
+
+    Table = get_table_class(table_name)
+    if Table is None:
+        return jsonify({'error': 'Table not found'}), 404
+
+    data = request.json
+    try:
+        for entry in data:
+            row = db.session.query(Table).filter_by(id=entry['id']).first()
+            if row:
+                for key, value in entry.items():
+                    if key != 'id' and hasattr(row, key):
+                        setattr(row, key, value)
+        db.session.commit()
+        return jsonify({'message': 'Entries updated successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

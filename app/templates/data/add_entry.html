@@ -1,35 +1,30 @@
-<!-- File: app/templates/data/add_entry.html -->
 {% extends "base.html" %}
-
 {% block title %}Add Entry - {{ table_name | title }}{% endblock %}
-
 {% block content %}
 <h1 class="text-2xl font-bold mb-4">Add New Entry to {{ table_name | title }}</h1>
 
-<form method="POST" class="max-w-lg mx-auto">
+<form method="POST" action="{{ url_for('data.add_entry', table_name=table_name) }}">
     <div class="mb-4">
-        <label for="core_uuid" class="block text-gray-700 text-sm font-bold mb-2">
-            Select Core Entry
-        </label>
-        <select id="core_uuid" name="core_uuid" required
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        <label for="core_uuid" class="block text-sm font-medium text-gray-700">Select Core Entry</label>
+        <select id="core_uuid" name="core_uuid" required class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
             <option value="">Select a core entry</option>
             {% for core_entry in core_entries %}
             <option value="{{ core_entry.uuid }}">{{ core_entry.name }}</option>
             {% endfor %}
         </select>
     </div>
+
     {% for column in columns %}
+    {% if column.name != 'core_uuid' %}
     <div class="mb-4">
-        <label for="{{ column.name }}" class="block text-gray-700 text-sm font-bold mb-2">
-            {{ column.name | title }}
-        </label>
-        <input type="text" id="{{ column.name }}" name="{{ column.name }}" 
-               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        <label for="{{ column.name }}" class="block text-sm font-medium text-gray-700">{{ column.name | title }}</label>
+        <input type="text" id="{{ column.name }}" name="{{ column.name }}" required class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
     </div>
+    {% endif %}
     {% endfor %}
+
     <div class="flex items-center justify-between">
-        <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
             Add Entry
         </button>
         <a href="{{ url_for('data.view_table', table_name=table_name) }}" class="text-blue-500 hover:text-blue-800">
