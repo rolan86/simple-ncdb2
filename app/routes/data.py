@@ -4,7 +4,7 @@ from flask import Blueprint, render_template, flash, redirect, url_for, request,
 from flask_login import login_required, current_user
 from app import db
 from app.models.dynamic_tables import create_dynamic_table, get_table_class, get_all_dynamic_tables
-from sqlalchemy import inspect, insert, select
+from sqlalchemy import inspect, insert, select, update
 from app.models.core_table import CoreTable
 from sqlalchemy.orm import aliased
 import logging
@@ -47,7 +47,7 @@ def view_table(table_name):
 
         data = []
         columns = [column.name for column in Table.columns
-                   if column.name not in ['id', 'created_at', 'updated_at']]
+                   if column.name not in ['created_at', 'updated_at']]  # Include 'id' in columns
 
         print(f"Columns for table {table_name}: {columns}")
 
@@ -160,8 +160,8 @@ def add_entry(table_name):
 @bp.route('/edit_entry/<table_name>/<int:entry_id>', methods=['GET', 'POST'])
 @login_required
 def edit_entry(table_name, entry_id):
-    if 'edit' not in current_user.permissions.split(',') or table_name not in current_user.accessible_tables.split(','):
-        flash('You do not have permission to edit this table.', 'error')
+    if 'edit' not in current_user.permissions.split(',') or table_name not in current_user.get_accessible_tables():
+        flash('You do not have permission to edit entries in this table.', 'error')
         return redirect(url_for('main.dashboard'))
 
     Table = get_table_class(table_name)
@@ -169,18 +169,40 @@ def edit_entry(table_name, entry_id):
         flash('Table not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
-    entry = Table.query.get_or_404(entry_id)
+    stmt = select(Table).where(Table.c.id == entry_id)
+    result = db.session.execute(stmt).first()
 
-    if request.method == 'POST':
-        for column in Table.__table__.columns:
-            if column.name not in ['id', 'core_uuid', 'created_at', 'updated_at']:
-                setattr(entry, column.name, request.form.get(column.name))
-        db.session.commit()
-        flash('Entry updated successfully.', 'success')
+    if result is None:
+        flash('Entry not found.', 'error')
         return redirect(url_for('data.view_table', table_name=table_name))
 
-    columns = [column for column in Table.__table__.columns if column.name not in ['id', 'core_uuid', 'created_at', 'updated_at']]
-    return render_template('data/edit_entry.html', table_name=table_name, entry=entry, columns=columns)
+    columns = [column for column in Table.columns
+               if column.name not in ['id', 'core_uuid', 'created_at', 'updated_at']]
+
+    if request.method == 'POST':
+        try:
+            update_data = {}
+            for column in columns:
+                update_data[column.name] = request.form.get(column.name)
+
+            stmt = update(Table).where(Table.c.id == entry_id).values(**update_data)
+            db.session.execute(stmt)
+            db.session.commit()
+
+            flash('Entry updated successfully.', 'success')
+            return redirect(url_for('data.view_table', table_name=table_name))
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error updating entry: {str(e)}")
+            flash(f'Error updating entry: {str(e)}', 'error')
+
+    # Convert the result to a dictionary
+    entry = {column.name: getattr(result, column.name) for column in Table.columns}
+
+    return render_template('data/edit_entry.html',
+                           table_name=table_name,
+                           entry=entry,
+                           columns=columns)
 
 def get_table_data(table_name):
     Table = get_table_class(table_name)
