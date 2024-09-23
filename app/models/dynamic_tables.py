@@ -6,7 +6,7 @@ from datetime import datetime
 import logging
 from .dynamic_table import DynamicTable
 
-def create_dynamic_table(table_name, columns):
+def create_dynamic_table(table_name, columns, owner_id, is_independent=False):
     logging.info(f"Creating dynamic table: {table_name}")
 
     # Check if the table already exists
@@ -16,7 +16,12 @@ def create_dynamic_table(table_name, columns):
         return get_table_class(table_name)
 
     # Create a new entry in the DynamicTable model
-    new_dynamic_table = DynamicTable(table_name=table_name, schema=columns)
+    new_dynamic_table = DynamicTable(
+        table_name=table_name,
+        schema=columns,
+        owner_id=owner_id,
+        is_independent=is_independent
+    )
     db.session.add(new_dynamic_table)
     db.session.commit()
 
@@ -24,7 +29,7 @@ def create_dynamic_table(table_name, columns):
     metadata = db.metadata
     table = Table(table_name, metadata,
         Column('id', Integer, primary_key=True),
-        Column('core_uuid', String(36), ForeignKey('core_table.uuid'), nullable=False),
+        Column('core_uuid', String(36), ForeignKey('core_table.uuid'), nullable=is_independent),
         Column('created_at', DateTime, default=datetime.utcnow),
         Column('updated_at', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     )
@@ -40,6 +45,7 @@ def create_dynamic_table(table_name, columns):
     logging.info(f"Dynamic table {table_name} created successfully")
     return table
 
+
 def get_table_class(table_name):
     logging.info(f"Attempting to get table class for: {table_name}")
     dynamic_table = DynamicTable.query.filter_by(table_name=table_name).first()
@@ -53,7 +59,7 @@ def get_table_class(table_name):
 def get_all_dynamic_tables():
     return [table.table_name for table in DynamicTable.query.all()]
 
-def ensure_dynamic_tables_exist():
+def ensure_dynamic_tables_exist(owner_id):
     tables_to_create = [
         ('employees', {
             'name': 'string',
@@ -68,6 +74,11 @@ def ensure_dynamic_tables_exist():
     ]
 
     for table_name, columns in tables_to_create:
-        create_dynamic_table(table_name, columns)
+        existing_table = DynamicTable.query.filter_by(table_name=table_name).first()
+        if not existing_table:
+            create_dynamic_table(table_name, columns, owner_id=owner_id, is_independent=False)
+            logging.info(f"Created dynamic table: {table_name}")
+        else:
+            logging.info(f"Dynamic table {table_name} already exists")
 
     logging.info(f"Ensured existence of dynamic tables: {get_all_dynamic_tables()}")

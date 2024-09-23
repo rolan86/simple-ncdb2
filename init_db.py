@@ -4,7 +4,7 @@ from app import create_app, db
 from app.models.user import User
 from app.models.dynamic_table import DynamicTable
 from app.models.core_table import CoreTable
-from app.models.log import Log  # Import the new Log model
+from app.models.log import Log
 from app.models.dynamic_tables import ensure_dynamic_tables_exist
 from werkzeug.security import generate_password_hash
 import logging
@@ -16,18 +16,18 @@ def init_database():
         try:
             db.create_all()
             logging.info("All tables created.")
-            
+
             # Create admin user if not exists
-            create_admin_user()
+            admin = create_admin_user()
 
             # Create core entries
             create_core_entries()
 
             # Ensure dynamic tables exist
-            ensure_dynamic_tables_exist()
+            ensure_dynamic_tables_exist(admin.id)
 
             # Create regular users with specific table access
-            create_regular_users()
+            create_regular_users(admin.id)
 
             logging.info("Database initialized successfully.")
         except Exception as e:
@@ -54,9 +54,9 @@ def create_admin_user():
     admin.accessible_tables = ','.join([table.table_name for table in dynamic_tables])
     db.session.commit()
     logging.info("Admin user's accessible tables updated.")
+    return admin
 
 def create_core_entries():
-    # Check if core entries already exist
     if CoreTable.query.first():
         logging.info("Core entries already exist. Skipping creation.")
         return
@@ -96,7 +96,7 @@ def create_core_entries():
     db.session.commit()
     logging.info(f"{len(core_entries)} core entries created successfully.")
 
-def create_regular_users():
+def create_regular_users(admin_id):
     users_data = [
         {
             'username': 'user1',
@@ -129,10 +129,11 @@ def create_regular_users():
                 is_admin=False
             )
             db.session.add(user)
-            
+            db.session.flush()  # This will assign an ID to the user
+
             # Log the user creation
             log_entry = Log(
-                user_id=1,  # Assuming admin (id=1) is creating these users
+                user_id=admin_id,
                 action='create_user',
                 table_name='users',
                 entry_id=user.id,

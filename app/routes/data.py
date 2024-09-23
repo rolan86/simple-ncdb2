@@ -5,7 +5,9 @@ from flask_login import login_required, current_user
 from app import db
 from app.models.dynamic_tables import create_dynamic_table, get_table_class, get_all_dynamic_tables
 from app.models.log import Log
-from sqlalchemy import inspect, insert, select, update
+from app.models.user import User
+from app.models.dynamic_table import DynamicTable
+from sqlalchemy import inspect, insert, select, update, Table, Column
 from app.models.core_table import CoreTable
 from sqlalchemy.orm import aliased
 import logging
@@ -321,9 +323,11 @@ def debug_tables():
 @bp.route('/create_dynamic_table', methods=['GET', 'POST'])
 @login_required
 def create_dynamic_table_route():
-    if not current_user.can_create_tables():
+    if not current_user.is_admin:
         flash('You do not have permission to create tables.', 'error')
         return redirect(url_for('main.dashboard'))
+
+    users = User.query.filter(User.id != current_user.id).all()  # Get all users except current admin
 
     if request.method == 'POST':
         table_name = request.form.get('table_name')
@@ -334,18 +338,14 @@ def create_dynamic_table_route():
             if column_name and column_type:
                 columns[column_name] = column_type
 
+        owner_id = request.form.get('owner_id')
+        is_independent = request.form.get('is_independent') == 'on'
+
         if not table_name or not columns:
             flash('Table name and at least one column are required.', 'error')
         else:
             try:
-                create_dynamic_table(table_name, columns)
-
-                # Update admin's accessible tables
-                if current_user.is_admin:
-                    accessible_tables = set(current_user.get_accessible_tables())
-                    accessible_tables.add(table_name)
-                    current_user.accessible_tables = ','.join(accessible_tables)
-                    db.session.commit()
+                new_table = create_dynamic_table(table_name, columns, owner_id, is_independent)
 
                 flash(f'Dynamic table "{table_name}" created successfully.', 'success')
                 return redirect(url_for('data.create_dynamic_table_route'))
@@ -353,7 +353,7 @@ def create_dynamic_table_route():
                 flash(f'Error creating table: {str(e)}', 'error')
 
     existing_tables = get_all_dynamic_tables()
-    return render_template('data/create_dynamic_table.html', existing_tables=existing_tables)
+    return render_template('data/create_dynamic_table.html', existing_tables=existing_tables, users=users)
 
 @bp.route('/update_entries/<table_name>', methods=['PUT'])
 @login_required
