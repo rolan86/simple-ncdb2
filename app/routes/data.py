@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def view_table(table_name):
     print(f"Accessing view_table for table: {table_name}")
-    if table_name not in current_user.get_accessible_tables():
+    if not current_user.can_access_table(table_name):
         flash('You do not have permission to view this table.', 'error')
         return redirect(url_for('main.dashboard'))
 
@@ -131,8 +131,13 @@ def view_data(table_name, view_type):
 @bp.route('/add_entry/<table_name>', methods=['GET', 'POST'])
 @login_required
 def add_entry(table_name):
-    if 'edit' not in current_user.permissions.split(',') or table_name not in current_user.get_accessible_tables():
+    if 'edit' not in current_user.permissions.split(',') or not current_user.can_access_table(table_name):
         flash('You do not have permission to add entries to this table.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+    dynamic_table = DynamicTable.query.filter_by(table_name=table_name).first()
+    if dynamic_table is None:
+        flash('Table not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
     Table = get_table_class(table_name)
@@ -140,8 +145,7 @@ def add_entry(table_name):
         flash('Table not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
-    # Fetch core entries for the dropdown
-    core_entries = CoreTable.query.all()
+    core_entries = CoreTable.query.all() if not dynamic_table.is_independent else []
 
     if request.method == 'POST':
         new_entry = {}
@@ -149,20 +153,19 @@ def add_entry(table_name):
             if column.name not in ['id', 'created_at', 'updated_at']:
                 new_entry[column.name] = request.form.get(column.name)
 
-        # Get the selected core_uuid
-        new_entry['core_uuid'] = request.form.get('core_uuid')
+        if not dynamic_table.is_independent:
+            new_entry['core_uuid'] = request.form.get('core_uuid')
 
         reason = request.form.get('reason')
         if not reason:
             flash('Please provide a reason for this entry.', 'error')
-            return render_template('data/add_entry.html', table_name=table_name, columns=Table.columns, core_entries=core_entries)
+            return render_template('data/add_entry.html', table_name=table_name, columns=Table.columns, core_entries=core_entries, is_independent=dynamic_table.is_independent)
 
         try:
             stmt = insert(Table).values(**new_entry)
             result = db.session.execute(stmt)
             db.session.commit()
 
-            # Log the action
             log_entry = Log(user_id=current_user.id, action='add', table_name=table_name,
                             entry_id=result.inserted_primary_key[0], reason=reason)
             db.session.add(log_entry)
@@ -175,7 +178,7 @@ def add_entry(table_name):
             flash(f'Error adding entry: {str(e)}', 'error')
 
     columns = [column for column in Table.columns if column.name not in ['id', 'created_at', 'updated_at']]
-    return render_template('data/add_entry.html', table_name=table_name, columns=columns, core_entries=core_entries)
+    return render_template('data/add_entry.html', table_name=table_name, columns=columns, core_entries=core_entries, is_independent=dynamic_table.is_independent)
 
 @bp.route('/edit_entry/<table_name>/<int:entry_id>', methods=['GET', 'POST'])
 @login_required
@@ -320,14 +323,14 @@ def debug_tables():
         'dynamic_tables': dynamic_tables,
     })
 
+# In app/routes/data.py
+
 @bp.route('/create_dynamic_table', methods=['GET', 'POST'])
 @login_required
 def create_dynamic_table_route():
-    if not current_user.is_admin:
+    if not current_user.can_create_tables():
         flash('You do not have permission to create tables.', 'error')
         return redirect(url_for('main.dashboard'))
-
-    users = User.query.filter(User.id != current_user.id).all()  # Get all users except current admin
 
     if request.method == 'POST':
         table_name = request.form.get('table_name')
@@ -338,20 +341,29 @@ def create_dynamic_table_route():
             if column_name and column_type:
                 columns[column_name] = column_type
 
-        owner_id = request.form.get('owner_id')
+        owner_id = int(request.form.get('owner_id'))
         is_independent = request.form.get('is_independent') == 'on'
 
         if not table_name or not columns:
             flash('Table name and at least one column are required.', 'error')
         else:
             try:
-                new_table = create_dynamic_table(table_name, columns, owner_id, is_independent)
+                new_table = create_dynamic_table(table_name, columns, owner_id=owner_id, is_independent=is_independent)
+
+                # Update owner's accessible tables
+                owner = User.query.get(owner_id)
+                if owner:
+                    accessible_tables = set(owner.get_accessible_tables())
+                    accessible_tables.add(table_name)
+                    owner.accessible_tables = ','.join(accessible_tables)
+                    db.session.commit()
 
                 flash(f'Dynamic table "{table_name}" created successfully.', 'success')
                 return redirect(url_for('data.create_dynamic_table_route'))
             except Exception as e:
                 flash(f'Error creating table: {str(e)}', 'error')
 
+    users = User.query.all()  # Get all users for the owner selection dropdown
     existing_tables = get_all_dynamic_tables()
     return render_template('data/create_dynamic_table.html', existing_tables=existing_tables, users=users)
 

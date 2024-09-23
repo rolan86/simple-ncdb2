@@ -14,5 +14,11 @@ def index():
 @bp.route('/dashboard')
 @login_required
 def dashboard():
-    accessible_tables = current_user.accessible_tables.split(',') if current_user.accessible_tables else []
-    return render_template('dashboard.html', tables=accessible_tables)
+    accessible_tables = current_user.get_accessible_tables()
+    owned_tables = [table.table_name for table in current_user.owned_tables]
+    all_tables = list(set(accessible_tables + owned_tables))
+
+    return render_template('dashboard.html',
+                           username=current_user.username,
+                           tables=all_tables,
+                           is_admin=current_user.is_admin)

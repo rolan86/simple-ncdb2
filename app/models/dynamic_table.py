@@ -1,5 +1,3 @@
-# File: app/models/dynamic_table.py
-
 from app import db
 from sqlalchemy.types import JSON
 
@@ -14,7 +12,7 @@ class DynamicTable(db.Model):
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
-    owner = db.relationship('User', backref=db.backref('owned_tables', lazy='dynamic'))
+    table_owner = db.relationship('User', back_populates='owned_tables')
 
     def __repr__(self):
         return f'<DynamicTable {self.table_name}>'

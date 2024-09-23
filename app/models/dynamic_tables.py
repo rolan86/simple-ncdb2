@@ -9,13 +9,11 @@ from .dynamic_table import DynamicTable
 def create_dynamic_table(table_name, columns, owner_id, is_independent=False):
     logging.info(f"Creating dynamic table: {table_name}")
 
-    # Check if the table already exists
     existing_table = DynamicTable.query.filter_by(table_name=table_name).first()
     if existing_table:
-        logging.info(f"Table {table_name} already exists, returning existing class")
-        return get_table_class(table_name)
+        logging.info(f"Table {table_name} already exists")
+        return existing_table
 
-    # Create a new entry in the DynamicTable model
     new_dynamic_table = DynamicTable(
         table_name=table_name,
         schema=columns,
@@ -25,26 +23,27 @@ def create_dynamic_table(table_name, columns, owner_id, is_independent=False):
     db.session.add(new_dynamic_table)
     db.session.commit()
 
-    # Create the actual table
     metadata = db.metadata
-    table = Table(table_name, metadata,
+    table_columns = [
         Column('id', Integer, primary_key=True),
-        Column('core_uuid', String(36), ForeignKey('core_table.uuid'), nullable=is_independent),
         Column('created_at', DateTime, default=datetime.utcnow),
         Column('updated_at', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    )
+    ]
+
+    if not is_independent:
+        table_columns.append(Column('core_uuid', String(36), ForeignKey('core_table.uuid'), nullable=False))
 
     for column_name, column_type in columns.items():
         if column_type == 'string':
-            table.append_column(Column(column_name, String(255)))
+            table_columns.append(Column(column_name, String(255)))
         elif column_type == 'integer':
-            table.append_column(Column(column_name, Integer))
+            table_columns.append(Column(column_name, Integer))
         logging.info(f"Added column {column_name} of type {column_type} to {table_name}")
 
+    table = Table(table_name, metadata, *table_columns)
     table.create(db.engine)
     logging.info(f"Dynamic table {table_name} created successfully")
-    return table
-
+    return new_dynamic_table
 
 def get_table_class(table_name):
     logging.info(f"Attempting to get table class for: {table_name}")
