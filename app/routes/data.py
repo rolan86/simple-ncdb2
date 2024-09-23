@@ -16,64 +16,75 @@ from app.models.dynamic_tables import get_table_class
 from app.models.core_table import CoreTable
 from sqlalchemy.orm import aliased
 
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+
 @bp.route('/view_table/<table_name>')
 @login_required
 def view_table(table_name):
+    print(f"Accessing view_table for table: {table_name}")
     if table_name not in current_user.get_accessible_tables():
         flash('You do not have permission to view this table.', 'error')
         return redirect(url_for('main.dashboard'))
-    
+
     Table = get_table_class(table_name)
     if Table is None:
         flash('Table not found.', 'error')
         return redirect(url_for('main.dashboard'))
-    
+
     try:
         # Fetch data from the dynamic table
         stmt = select(Table)
+        print(f"SQL Query: {stmt}")
+
         result = db.session.execute(stmt)
-        
-        # Log raw query result
-        logging.debug(f"Raw query result: {list(result)}")
-        
+
+        # Print raw query result
+        raw_result = list(result)
+        print(f"Raw query result: {raw_result}")
+
         data = []
-        columns = [column.name for column in Table.columns 
+        columns = [column.name for column in Table.columns
                    if column.name not in ['id', 'created_at', 'updated_at']]
-        
-        logging.debug(f"Columns for table {table_name}: {columns}")
-        
-        for row in result:
+
+        print(f"Columns for table {table_name}: {columns}")
+
+        for row in raw_result:
             row_dict = {}
-            for column in columns:
-                value = getattr(row[0], column, None)
-                row_dict[column] = str(value) if value is not None else ''
-            
-            logging.debug(f"Processed row data: {row_dict}")
-            
+            for i, column in enumerate(Table.columns):
+                if column.name in columns:
+                    row_dict[column.name] = str(row[i]) if row[i] is not None else ''
+
+            print(f"Processed row data: {row_dict}")
+
             core_entry = None
             if 'core_uuid' in row_dict and row_dict['core_uuid']:
                 core_entry = CoreTable.query.filter_by(uuid=row_dict['core_uuid']).first()
-                logging.debug(f"Core entry found: {core_entry}")
-            
+                print(f"Core entry found: {core_entry}")
+
             core_data = core_entry.to_dict() if core_entry else {}
-            logging.debug(f"Core data: {core_data}")
-            
+            print(f"Core data: {core_data}")
+
             data.append((row_dict, core_data))
-        
+
         core_columns = ['name', 'description']
-        
-        logging.debug(f"Final data: {data}")
-        logging.debug(f"Core columns: {core_columns}")
-        
-        return render_template('data/table_view.html', 
-                               table_name=table_name, 
-                               data=data, 
+
+        print(f"Final data: {data}")
+        print(f"Core columns: {core_columns}")
+
+        return render_template('data/table_view.html',
+                               table_name=table_name,
+                               data=data,
                                columns=columns,
                                core_columns=core_columns,
                                user_permissions=current_user.permissions.split(','),
                                user_tables=current_user.get_accessible_tables())
     except Exception as e:
-        logging.error(f"Error viewing table {table_name}: {str(e)}")
+        print(f"Error viewing table {table_name}: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         flash(f'Error viewing table: {str(e)}', 'error')
         return redirect(url_for('main.dashboard'))
 
@@ -131,7 +142,7 @@ def add_entry(table_name):
         for column in Table.columns:
             if column.name not in ['id', 'created_at', 'updated_at']:
                 new_entry[column.name] = request.form.get(column.name)
-        
+
         try:
             stmt = insert(Table).values(**new_entry)
             db.session.execute(stmt)
