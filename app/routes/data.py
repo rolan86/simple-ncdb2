@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, flash, redirect, url_for, request,
 from flask_login import login_required, current_user
 from app import db
 from app.models.dynamic_tables import create_dynamic_table, get_table_class, get_all_dynamic_tables
+from app.models.log import Log
 from sqlalchemy import inspect, insert, select, update
 from app.models.core_table import CoreTable
 from sqlalchemy.orm import aliased
@@ -137,16 +138,34 @@ def add_entry(table_name):
         flash('Table not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
+    # Fetch core entries for the dropdown
+    core_entries = CoreTable.query.all()
+
     if request.method == 'POST':
         new_entry = {}
         for column in Table.columns:
             if column.name not in ['id', 'created_at', 'updated_at']:
                 new_entry[column.name] = request.form.get(column.name)
 
+        # Get the selected core_uuid
+        new_entry['core_uuid'] = request.form.get('core_uuid')
+
+        reason = request.form.get('reason')
+        if not reason:
+            flash('Please provide a reason for this entry.', 'error')
+            return render_template('data/add_entry.html', table_name=table_name, columns=Table.columns, core_entries=core_entries)
+
         try:
             stmt = insert(Table).values(**new_entry)
-            db.session.execute(stmt)
+            result = db.session.execute(stmt)
             db.session.commit()
+
+            # Log the action
+            log_entry = Log(user_id=current_user.id, action='add', table_name=table_name,
+                            entry_id=result.inserted_primary_key[0], reason=reason)
+            db.session.add(log_entry)
+            db.session.commit()
+
             flash('New entry added successfully.', 'success')
             return redirect(url_for('data.view_table', table_name=table_name))
         except Exception as e:
@@ -154,7 +173,6 @@ def add_entry(table_name):
             flash(f'Error adding entry: {str(e)}', 'error')
 
     columns = [column for column in Table.columns if column.name not in ['id', 'created_at', 'updated_at']]
-    core_entries = CoreTable.query.all()
     return render_template('data/add_entry.html', table_name=table_name, columns=columns, core_entries=core_entries)
 
 @bp.route('/edit_entry/<table_name>/<int:entry_id>', methods=['GET', 'POST'])
@@ -180,6 +198,12 @@ def edit_entry(table_name, entry_id):
                if column.name not in ['id', 'core_uuid', 'created_at', 'updated_at']]
 
     if request.method == 'POST':
+        reason = request.form.get('reason')
+        if not reason:
+            flash('Please provide a reason for this edit.', 'error')
+            entry = {column.name: getattr(result, column.name) for column in Table.columns}
+            return render_template('data/edit_entry.html', table_name=table_name, entry=entry, columns=columns)
+
         try:
             update_data = {}
             for column in columns:
@@ -187,6 +211,11 @@ def edit_entry(table_name, entry_id):
 
             stmt = update(Table).where(Table.c.id == entry_id).values(**update_data)
             db.session.execute(stmt)
+
+            # Log the action
+            log_entry = Log(user_id=current_user.id, action='edit', table_name=table_name,
+                            entry_id=entry_id, reason=reason)
+            db.session.add(log_entry)
             db.session.commit()
 
             flash('Entry updated successfully.', 'success')
@@ -196,13 +225,8 @@ def edit_entry(table_name, entry_id):
             logging.error(f"Error updating entry: {str(e)}")
             flash(f'Error updating entry: {str(e)}', 'error')
 
-    # Convert the result to a dictionary
     entry = {column.name: getattr(result, column.name) for column in Table.columns}
-
-    return render_template('data/edit_entry.html',
-                           table_name=table_name,
-                           entry=entry,
-                           columns=columns)
+    return render_template('data/edit_entry.html', table_name=table_name, entry=entry, columns=columns)
 
 def get_table_data(table_name):
     Table = get_table_class(table_name)
