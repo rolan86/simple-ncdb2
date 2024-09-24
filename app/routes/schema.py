@@ -66,17 +66,26 @@ def edit_schema(schema_id):
 
         new_structure = []
         for parent, child, rel_type in zip(parents, children, types):
-            if parent and child and rel_type:
+            if parent.strip() and child.strip() and rel_type.strip():
                 new_structure.append({
-                    'parent': parent,
-                    'child': child,
-                    'type': rel_type
+                    'parent': parent.strip(),
+                    'child': child.strip(),
+                    'type': rel_type.strip()
                 })
 
-        schema.structure = new_structure
-        db.session.commit()
-        flash('Schema updated successfully.', 'success')
-        return redirect(url_for('schema.view_schema', schema_id=schema.id))
+        if not new_structure:
+            flash('At least one valid relationship is required.', 'error')
+            return render_template('schema/edit_schema.html', schema=schema)
+
+        schema.structure = json.dumps(new_structure)
+        try:
+            db.session.commit()
+            flash('Schema updated successfully.', 'success')
+            return redirect(url_for('schema.view_schema', schema_id=schema.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating schema: {str(e)}', 'error')
+            return render_template('schema/edit_schema.html', schema=schema)
 
     return render_template('schema/edit_schema.html', schema=schema)
 

@@ -21,6 +21,15 @@
             <h2 class="text-lg font-semibold mb-2">Table Relationships</h2>
             <p class="text-sm text-gray-600 mb-4">Define the relationships between tables in your schema. Each relationship consists of a parent table, a child table, and the type of relationship between them.</p>
 
+            <div class="mb-4 p-4 bg-white rounded-md shadow">
+                <h3 class="font-semibold mb-2">Relationship Types Explained:</h3>
+                <ul class="list-disc pl-5 text-sm">
+                    <li><strong>One to One:</strong> Each record in the parent table is related to one and only one record in the child table. Example: Each person has one passport number.</li>
+                    <li><strong>One to Many:</strong> Each record in the parent table can be related to multiple records in the child table, but each record in the child table is related to only one record in the parent table. Example: One department can have many employees.</li>
+                    <li><strong>Many to Many:</strong> Multiple records in the parent table can be related to multiple records in the child table. Example: Students can enroll in multiple courses, and each course can have multiple students.</li>
+                </ul>
+            </div>
+
             <div id="relationships-container">
                 {% for relationship in schema.structure_json %}
                 <div class="relationship-entry mb-4 p-4 bg-white rounded-md shadow">
@@ -39,9 +48,9 @@
                             <label class="block text-sm font-medium text-gray-700">Relationship Type</label>
                             <select name="type[]" required
                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                <option value="one_to_one" {% if relationship.type == 'one_to_one' %}selected{% endif %}>One to One</option>
                                 <option value="one_to_many" {% if relationship.type == 'one_to_many' %}selected{% endif %}>One to Many</option>
                                 <option value="many_to_many" {% if relationship.type == 'many_to_many' %}selected{% endif %}>Many to Many</option>
-                                <option value="one_to_one" {% if relationship.type == 'one_to_one' %}selected{% endif %}>One to One</option>
                             </select>
                         </div>
                     </div>
