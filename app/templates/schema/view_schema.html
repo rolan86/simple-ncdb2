@@ -1,20 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-4">{{ schema.name }}</h1>
+    <h1 class="text-2xl font-bold mb-4">{{ schema.name }} (Version {{ schema.version }})</h1>
     <p class="mb-4">{{ schema.description }}</p>
-
     <h2 class="text-xl font-semibold mb-2">Relationships</h2>
     <div id="schema-visualization" class="w-full h-64 border border-gray-300 mb-4"></div>
-
-    <div class="space-x-2">
+    <div class="space-x-2 mb-4">
         <a href="{{ url_for('schema.edit_schema', schema_id=schema.id) }}" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">Edit Schema</a>
         <button onclick="deleteSchema({{ schema.id }})" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Delete Schema</button>
+        <a href="{{ url_for('schema.export_schema', schema_id=schema.id) }}" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Export Schema</a>
+        <a href="{{ url_for('schema.schema_versions', schema_name=schema.name) }}" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">View Versions</a>
     </div>
+    <h3 class="text-lg font-semibold mb-2">Table Relationships:</h3>
+    <ul class="list-disc pl-5">
+        {% for relationship in schema.get_relationships() %}
+        <li>{{ relationship.parent }} -> {{ relationship.child }} ({{ relationship.type }})</li>
+        {% endfor %}
+    </ul>
 </div>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
+function deleteSchema(schemaId) {
+    if (confirm('Are you sure you want to delete this schema?')) {
+        fetch(`/delete_schema/${schemaId}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = "{{ url_for('schema.manage_schemas') }}";
+                } else {
+                    alert('Error deleting schema');
+                }
+            });
+    }
+}
+
 function visualizeSchema() {
     const width = document.getElementById('schema-visualization').clientWidth;
     const height = document.getElementById('schema-visualization').clientHeight;

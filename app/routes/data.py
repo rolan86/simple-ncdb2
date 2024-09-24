@@ -1,5 +1,8 @@
 # File: app/routes/data.py
 
+import csv
+from io import StringIO
+from flask import send_file, make_response
 from flask import Blueprint, render_template, flash, redirect, url_for, request, jsonify
 from flask_login import login_required, current_user
 from app import db
@@ -390,3 +393,70 @@ def update_entries(table_name):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@bp.route('/export_table_data/<table_name>')
+@login_required
+def export_table_data(table_name):
+    if table_name not in current_user.get_accessible_tables():
+        flash('You do not have permission to export this table.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+    Table = get_table_class(table_name)
+    if Table is None:
+        flash('Table not found.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+    data = db.session.query(Table).all()
+
+    si = StringIO()
+    cw = csv.writer(si)
+
+    # Write headers
+    cw.writerow([column.name for column in Table.__table__.columns])
+
+    # Write data
+    for row in data:
+        cw.writerow([getattr(row, column.name) for column in Table.__table__.columns])
+
+    output = make_response(si.getvalue())
+    output.headers["Content-Disposition"] = f"attachment; filename={table_name}_export.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output
+
+@bp.route('/import_table_data/<table_name>', methods=['GET', 'POST'])
+@login_required
+def import_table_data(table_name):
+    if table_name not in current_user.get_accessible_tables():
+        flash('You do not have permission to import data to this table.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+    Table = get_table_class(table_name)
+    if Table is None:
+        flash('Table not found.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('No file part', 'error')
+            return redirect(request.url)
+        file = request.files['file']
+        if file.filename == '':
+            flash('No selected file', 'error')
+            return redirect(request.url)
+        if file:
+            try:
+                stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
+                csv_input = csv.reader(stream)
+                headers = next(csv_input)
+                for row in csv_input:
+                    new_entry = Table()
+                    for i, value in enumerate(row):
+                        setattr(new_entry, headers[i], value)
+                    db.session.add(new_entry)
+                db.session.commit()
+                flash('Data imported successfully', 'success')
+                return redirect(url_for('data.view_table', table_name=table_name))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error importing data: {str(e)}', 'error')
+    return render_template('data/import_table_data.html', table_name=table_name)

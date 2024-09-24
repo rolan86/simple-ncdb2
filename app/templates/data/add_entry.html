@@ -1,44 +1,39 @@
 {% extends "base.html" %}
 {% block content %}
-<h1 class="text-2xl font-bold mb-4">Add New Entry to {{ table_name | title }}</h1>
-
-<form method="POST" action="{{ url_for('data.add_entry', table_name=table_name) }}">
-    {% if not is_independent %}
-    <div class="mb-4">
-        <label for="core_uuid" class="block text-gray-700 text-sm font-bold mb-2">Select Core Entry</label>
-        <select id="core_uuid" name="core_uuid" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-            <option value="">Select a core entry</option>
-            {% for core_entry in core_entries %}
-            <option value="{{ core_entry.uuid }}">{{ core_entry.name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    {% endif %}
-
-    {% for column in columns %}
-    {% if column.name != 'core_uuid' %}
-    <div class="mb-4">
-        <label for="{{ column.name }}" class="block text-gray-700 text-sm font-bold mb-2">{{ column.name | title }}</label>
-        <input type="text" id="{{ column.name }}" name="{{ column.name }}" required
-               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-    </div>
-    {% endif %}
-    {% endfor %}
-
-    <div class="mb-4">
-        <label for="reason" class="block text-gray-700 text-sm font-bold mb-2">Reason for Entry</label>
-        <textarea id="reason" name="reason" required
-                  class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                  rows="3"></textarea>
-    </div>
-
-    <div class="flex items-center justify-between">
-        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-            Add Entry
-        </button>
-        <a href="{{ url_for('data.view_table', table_name=table_name) }}" class="text-blue-500 hover:text-blue-800">
-            Cancel
-        </a>
-    </div>
-</form>
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-4">Add New Entry to {{ table_name }}</h1>
+    <form method="POST">
+        {% for column in columns %}
+        {% if column.name not in ['id', 'created_at', 'updated_at'] %}
+        <div class="mb-4">
+            <label for="{{ column.name }}" class="block text-gray-700 text-sm font-bold mb-2">{{ column.name }}</label>
+            <input type="text" id="{{ column.name }}" name="{{ column.name }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% if not is_independent %}
+        <div class="mb-4">
+            <label for="core_uuid" class="block text-gray-700 text-sm font-bold mb-2">Core Entry</label>
+            <select id="core_uuid" name="core_uuid" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="">Select Core Entry</option>
+                {% for core_entry in core_entries %}
+                <option value="{{ core_entry.uuid }}">{{ core_entry.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="mb-4">
+            <label for="reason" class="block text-gray-700 text-sm font-bold mb-2">Reason for adding this entry</label>
+            <textarea id="reason" name="reason" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" rows="3"></textarea>
+        </div>
+        <div class="flex items-center justify-between">
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Add Entry
+            </button>
+            <a href="{{ url_for('data.view_table', table_name=table_name) }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
 {% endblock %}

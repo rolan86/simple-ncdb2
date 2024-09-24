@@ -1,119 +1,93 @@
 {% extends "base.html" %}
 {% block content %}
-
 <div class="container mx-auto px-4 py-8">
     <h1 class="text-2xl font-bold mb-4">Edit Schema: {{ schema.name }}</h1>
-
-    <form method="POST" class="space-y-4">
-        <div>
-            <label for="name" class="block text-sm font-medium text-gray-700">Schema Name</label>
-            <input type="text" name="name" id="name" value="{{ schema.name }}" required
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+    <form method="POST">
+        <div class="mb-4">
+            <label for="name" class="block text-gray-700 text-sm font-bold mb-2">Schema Name</label>
+            <input type="text" id="name" name="name" value="{{ schema.name }}" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
         </div>
-
-        <div>
-            <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
-            <textarea name="description" id="description" rows="3"
-                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">{{ schema.description }}</textarea>
+        <div class="mb-4">
+            <label for="description" class="block text-gray-700 text-sm font-bold mb-2">Description</label>
+            <textarea id="description" name="description" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" rows="3">{{ schema.description }}</textarea>
         </div>
-
-        <div class="bg-gray-100 p-4 rounded-md">
+        <div class="bg-gray-100 p-4 rounded-md mb-4">
             <h2 class="text-lg font-semibold mb-2">Table Relationships</h2>
-            <p class="text-sm text-gray-600 mb-4">Define the relationships between tables in your schema. Each relationship consists of a parent table, a child table, and the type of relationship between them.</p>
-
+            <p class="mb-2">Define the relationships between tables in your schema. Each relationship consists of a parent table, a child table, and the type of relationship between them.</p>
             <div class="mb-4 p-4 bg-white rounded-md shadow">
                 <h3 class="font-semibold mb-2">Relationship Types Explained:</h3>
-                <ul class="list-disc pl-5 text-sm">
-                    <li><strong>One to One:</strong> Each record in the parent table is related to one and only one record in the child table. Example: Each person has one passport number.</li>
-                    <li><strong>One to Many:</strong> Each record in the parent table can be related to multiple records in the child table, but each record in the child table is related to only one record in the parent table. Example: One department can have many employees.</li>
-                    <li><strong>Many to Many:</strong> Multiple records in the parent table can be related to multiple records in the child table. Example: Students can enroll in multiple courses, and each course can have multiple students.</li>
+                <ul class="list-disc pl-5">
+                    <li><strong>One to One:</strong> Each record in the parent table is related to one and only one record in the child table.</li>
+                    <li><strong>One to Many:</strong> Each record in the parent table can be related to multiple records in the child table, but each record in the child table is related to only one record in the parent table.</li>
+                    <li><strong>Many to Many:</strong> Multiple records in the parent table can be related to multiple records in the child table.</li>
                 </ul>
             </div>
-
             <div id="relationships-container">
                 {% for relationship in schema.structure_json %}
                 <div class="relationship-entry mb-4 p-4 bg-white rounded-md shadow">
                     <div class="grid grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Parent Table</label>
-                            <input type="text" name="parent[]" value="{{ relationship.parent }}" required
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Parent Table</label>
+                            <input type="text" name="parent[]" value="{{ relationship.parent }}" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Child Table</label>
-                            <input type="text" name="child[]" value="{{ relationship.child }}" required
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Child Table</label>
+                            <input type="text" name="child[]" value="{{ relationship.child }}" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Relationship Type</label>
-                            <select name="type[]" required
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                                <option value="one_to_one" {% if relationship.type == 'one_to_one' %}selected{% endif %}>One to One</option>
-                                <option value="one_to_many" {% if relationship.type == 'one_to_many' %}selected{% endif %}>One to Many</option>
-                                <option value="many_to_many" {% if relationship.type == 'many_to_many' %}selected{% endif %}>Many to Many</option>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Relationship Type</label>
+                            <select name="type[]" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                                <option value="One to One" {% if relationship.type == 'One to One' %}selected{% endif %}>One to One</option>
+                                <option value="One to Many" {% if relationship.type == 'One to Many' %}selected{% endif %}>One to Many</option>
+                                <option value="Many to Many" {% if relationship.type == 'Many to Many' %}selected{% endif %}>Many to Many</option>
                             </select>
                         </div>
                     </div>
-                    <button type="button" class="remove-relationship mt-2 text-red-600 hover:text-red-800">Remove Relationship</button>
+                    <button type="button" class="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" onclick="removeRelationship(this)">Remove Relationship</button>
                 </div>
                 {% endfor %}
             </div>
-
-            <button type="button" id="add-relationship" class="mt-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                Add Relationship
-            </button>
+            <button type="button" id="add-relationship" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Add Relationship</button>
         </div>
-
         <div class="flex items-center justify-between">
-            <button type="submit"
-                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                Update Schema
-            </button>
-            <a href="{{ url_for('schema.manage_schemas') }}"
-               class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                Cancel
-            </a>
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Update Schema</button>
+            <a href="{{ url_for('schema.manage_schemas') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</a>
         </div>
     </form>
 </div>
-
 <script>
-document.getElementById('add-relationship').addEventListener('click', function() {
+function addRelationship() {
     const container = document.getElementById('relationships-container');
     const newRelationship = document.createElement('div');
     newRelationship.className = 'relationship-entry mb-4 p-4 bg-white rounded-md shadow';
     newRelationship.innerHTML = `
         <div class="grid grid-cols-3 gap-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700">Parent Table</label>
-                <input type="text" name="parent[]" required
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Parent Table</label>
+                <input type="text" name="parent[]" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700">Child Table</label>
-                <input type="text" name="child[]" required
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Child Table</label>
+                <input type="text" name="child[]" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700">Relationship Type</label>
-                <select name="type[]" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                    <option value="one_to_many">One to Many</option>
-                    <option value="many_to_many">Many to Many</option>
-                    <option value="one_to_one">One to One</option>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Relationship Type</label>
+                <select name="type[]" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="One to One">One to One</option>
+                    <option value="One to Many">One to Many</option>
+                    <option value="Many to Many">Many to Many</option>
                 </select>
             </div>
         </div>
-        <button type="button" class="remove-relationship mt-2 text-red-600 hover:text-red-800">Remove Relationship</button>
+        <button type="button" class="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" onclick="removeRelationship(this)">Remove Relationship</button>
     `;
     container.appendChild(newRelationship);
-});
+}
 
-document.addEventListener('click', function(e) {
-    if (e.target && e.target.className.includes('remove-relationship')) {
-        e.target.closest('.relationship-entry').remove();
-    }
-});
+function removeRelationship(button) {
+    button.closest('.relationship-entry').remove();
+}
+
+document.getElementById('add-relationship').addEventListener('click', addRelationship);
 </script>
-
 {% endblock %}
