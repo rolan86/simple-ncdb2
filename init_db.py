@@ -3,12 +3,14 @@
 from app import create_app, db
 from app.models.user import User
 from app.models.dynamic_table import DynamicTable
+from app.models.schema_definition import SchemaDefinition
 from app.models.core_table import CoreTable
 from app.models.log import Log
 from app.models.dynamic_tables import ensure_dynamic_tables_exist
 from werkzeug.security import generate_password_hash
 import logging
 import uuid
+import json
 
 def init_database():
     app = create_app()
@@ -17,16 +19,10 @@ def init_database():
             db.create_all()
             logging.info("All tables created.")
 
-            # Create admin user if not exists
             admin = create_admin_user()
-
-            # Create core entries
             create_core_entries()
-
-            # Ensure dynamic tables exist
             ensure_dynamic_tables_exist(admin.id)
-
-            # Create regular users with specific table access
+            create_sample_schemas(admin.id)
             create_regular_users(admin.id)
 
             logging.info("Database initialized successfully.")
@@ -143,6 +139,42 @@ def create_regular_users(admin_id):
 
     db.session.commit()
     logging.info("Regular users created successfully.")
+
+def create_sample_schemas(admin_id):
+    if SchemaDefinition.query.first():
+        logging.info("Sample schemas already exist. Skipping creation.")
+        return
+
+    sample_schemas = [
+        {
+            'name': 'Employee Management',
+            'description': 'Schema for managing employees and departments',
+            'structure': json.dumps([
+                {'parent': 'departments', 'child': 'employees', 'type': 'one_to_many'},
+                {'parent': 'employees', 'child': 'projects', 'type': 'many_to_many'}
+            ])
+        },
+        {
+            'name': 'Project Tracking',
+            'description': 'Schema for tracking projects and tasks',
+            'structure': json.dumps([
+                {'parent': 'projects', 'child': 'tasks', 'type': 'one_to_many'},
+                {'parent': 'employees', 'child': 'tasks', 'type': 'many_to_many'}
+            ])
+        }
+    ]
+
+    for schema_data in sample_schemas:
+        schema = SchemaDefinition(
+            name=schema_data['name'],
+            description=schema_data['description'],
+            structure=schema_data['structure'],
+            owner_id=admin_id
+        )
+        db.session.add(schema)
+
+    db.session.commit()
+    logging.info(f"{len(sample_schemas)} sample schemas created successfully.")
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

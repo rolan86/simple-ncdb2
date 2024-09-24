@@ -15,10 +15,11 @@ def create_app():
     login_manager.init_app(app)
     migrate.init_app(app, db)
 
-    from .routes import auth, main, data
+    from .routes import auth, main, data, schema
     app.register_blueprint(auth.bp)
     app.register_blueprint(main.bp)
     app.register_blueprint(data.bp)
+    app.register_blueprint(schema.bp)
 
     @login_manager.user_loader
     def load_user(user_id):
