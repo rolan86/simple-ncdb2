@@ -80,13 +80,17 @@ def view_table(table_name):
         print(f"Final data: {data}")
         print(f"Core columns: {core_columns}")
 
+        dynamic_table = DynamicTable.query.filter_by(table_name=table_name).first()
+        is_independent = dynamic_table.is_independent if dynamic_table else False
+
         return render_template('data/table_view.html',
                                table_name=table_name,
                                data=data,
                                columns=columns,
                                core_columns=core_columns,
                                user_permissions=current_user.permissions.split(','),
-                               user_tables=current_user.get_accessible_tables())
+                               user_tables=current_user.get_accessible_tables(),
+                               is_independent=is_independent)
     except Exception as e:
         print(f"Error viewing table {table_name}: {str(e)}")
         import traceback
@@ -148,16 +152,25 @@ def add_entry(table_name):
         flash('Table not found.', 'error')
         return redirect(url_for('main.dashboard'))
 
-    core_entries = CoreTable.query.all() if not dynamic_table.is_independent else []
+    core_entries = None if dynamic_table.is_independent else CoreTable.query.all()
 
     if request.method == 'POST':
         new_entry = {}
         for column in Table.columns:
-            if column.name not in ['id', 'created_at', 'updated_at']:
+            if column.name not in ['id', 'created_at', 'updated_at', 'core_uuid']:
                 new_entry[column.name] = request.form.get(column.name)
 
         if not dynamic_table.is_independent:
-            new_entry['core_uuid'] = request.form.get('core_uuid')
+            core_id = request.form.get('core_id')
+            if not core_id:
+                flash('Please select a core entry.', 'error')
+                return render_template('data/add_entry.html', table_name=table_name, columns=Table.columns, core_entries=core_entries, is_independent=dynamic_table.is_independent)
+            core_entry = CoreTable.query.get(core_id)
+            if core_entry:
+                new_entry['core_uuid'] = core_entry.uuid
+            else:
+                flash('Invalid core entry selected.', 'error')
+                return render_template('data/add_entry.html', table_name=table_name, columns=Table.columns, core_entries=core_entries, is_independent=dynamic_table.is_independent)
 
         reason = request.form.get('reason')
         if not reason:
@@ -180,7 +193,7 @@ def add_entry(table_name):
             db.session.rollback()
             flash(f'Error adding entry: {str(e)}', 'error')
 
-    columns = [column for column in Table.columns if column.name not in ['id', 'created_at', 'updated_at']]
+    columns = [column for column in Table.columns if column.name not in ['id', 'created_at', 'updated_at', 'core_uuid']]
     return render_template('data/add_entry.html', table_name=table_name, columns=columns, core_entries=core_entries, is_independent=dynamic_table.is_independent)
 
 @bp.route('/edit_entry/<table_name>/<int:entry_id>', methods=['GET', 'POST'])
